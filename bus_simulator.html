@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🚌 City Bus Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --road: #2a2a2a;
+    --asphalt: #1a1a1a;
+    --sky: #0a1628;
+    --bus-yellow: #FFD700;
+    --bus-body: #FF8C00;
+    --neon-green: #00FF88;
+    --neon-blue: #00CFFF;
+    --neon-red: #FF3366;
+    --panel-bg: rgba(0,0,0,0.75);
+    --lane-line: #555;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--sky);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    cursor: none;
+  }
+
+  #gameContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* ---- SKY & CITY BG ---- */
+  #sky {
+    position: absolute; top:0; left:0; right:0;
+    height: 45%;
+    background: linear-gradient(180deg, #050d1a 0%, #0a1f3c 60%, #1a3a5c 100%);
+    overflow: hidden;
+  }
+
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle 2s infinite alternate;
+  }
+
+  @keyframes twinkle {
+    from { opacity: 0.3; } to { opacity: 1; }
+  }
+
+  /* City silhouette */
+  #cityline {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 120px;
+    background:
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 0 0 / 60px 80px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 70px 0 / 40px 100px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 120px 0 / 80px 70px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 210px 0 / 50px 90px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 270px 0 / 70px 60px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 350px 0 / 90px 110px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 450px 0 / 55px 85px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 515px 0 / 65px 70px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 590px 0 / 100px 95px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 700px 0 / 45px 115px,
+      linear-gradient(to top, #0d1b2a 50%, transparent 50%) 755px 0 / 75px 80px;
+    background-repeat: no-repeat;
+  }
+
+  /* ---- ROAD ---- */
+  #road {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 58%;
+    background: var(--asphalt);
+    border-top: 4px solid #444;
+  }
+
+  /* Road stripes */
+  .lane-stripe {
+    position: absolute;
+    width: 60px;
+    height: 12px;
+    background: #666;
+    border-radius: 2px;
+    animation: stripeScroll 0.4s linear infinite;
+  }
+
+  @keyframes stripeScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(80px); }
+  }
+
+  /* Sidewalk */
+  #sidewalk {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: repeating-linear-gradient(90deg, #555 0, #555 40px, #666 40px, #666 80px);
+    border-top: 3px solid #888;
+  }
+
+  /* ---- BUS ---- */
+  #bus {
+    position: absolute;
+    left: 80px;
+    transition: top 0.15s ease, left 0.1s ease;
+    z-index: 20;
+    filter: drop-shadow(0 8px 20px rgba(0,0,0,0.7));
+  }
+
+  /* Wheels */
+  .wheel {
+    animation: spin 0.3s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* ---- OBSTACLES ---- */
+  .obstacle {
+    position: absolute;
+    z-index: 15;
+    transition: none;
+  }
+
+  /* ---- PASSENGERS ---- */
+  .passenger {
+    position: absolute;
+    z-index: 12;
+    cursor: pointer;
+    animation: bounce 0.5s ease infinite alternate;
+  }
+
+  @keyframes bounce {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-6px); }
+  }
+
+  /* ---- BUS STOP ---- */
+  .bus-stop {
+    position: absolute;
+    z-index: 12;
+  }
+
+  /* ---- HUD ---- */
+  #hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 50;
+    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+  }
+
+  .hud-panel {
+    background: var(--panel-bg);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 8px;
+    padding: 8px 16px;
+    backdrop-filter: blur(6px);
+  }
+
+  .hud-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: var(--neon-green);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .hud-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 0 10px var(--neon-green);
+  }
+
+  #speedMeter {
+    color: var(--neon-blue);
+    text-shadow: 0 0 10px var(--neon-blue);
+  }
+
+  #livesDisplay { color: var(--neon-red); }
+
+  /* ---- BOTTOM CONTROLS ---- */
+  #controls {
+    position: absolute;
+    bottom: 70px;
+    right: 20px;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 50px 50px 50px;
+    grid-template-rows: 50px 50px 50px;
+    gap: 6px;
+  }
+
+  .ctrl-btn {
+    background: rgba(0,0,0,0.7);
+    border: 2px solid rgba(0,255,136,0.5);
+    border-radius: 10px;
+    color: var(--neon-green);
+    font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .ctrl-btn:active, .ctrl-btn.pressed {
+    background: rgba(0,255,136,0.2);
+    transform: scale(0.9);
+    border-color: var(--neon-green);
+  }
+
+  #btnUp    { grid-column: 2; grid-row: 1; }
+  #btnLeft  { grid-column: 1; grid-row: 2; }
+  #btnRight { grid-column: 3; grid-row: 2; }
+  #btnDown  { grid-column: 2; grid-row: 3; }
+
+  /* ---- SPEEDOMETER GAUGE ---- */
+  #speedGauge {
+    position: absolute;
+    bottom: 70px;
+    left: 20px;
+    z-index: 50;
+  }
+
+  /* ---- FUEL BAR ---- */
+  #fuelContainer {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    width: 300px;
+    text-align: center;
+  }
+
+  #fuelLabel {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: #FF8C00;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+
+  #fuelBar {
+    width: 100%;
+    height: 12px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #FF8C00;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  #fuelFill {
+    height: 100%;
+    background: linear-gradient(90deg, #FF4500, #FF8C00, #FFD700);
+    border-radius: 6px;
+    transition: width 0.3s;
+  }
+
+  /* ---- OVERLAYS ---- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+  }
+
+  .overlay-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(32px, 6vw, 72px);
+    font-weight: 900;
+    color: var(--bus-yellow);
+    text-shadow: 0 0 30px var(--bus-yellow), 0 0 60px rgba(255,215,0,0.4);
+    margin-bottom: 10px;
+    letter-spacing: 4px;
+    text-align: center;
+  }
+
+  .overlay-sub {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(14px, 2.5vw, 22px);
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 40px;
+    text-align: center;
+    max-width: 500px;
+    line-height: 1.5;
+  }
+
+  .overlay-btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    padding: 14px 40px;
+    background: var(--bus-yellow);
+    color: #000;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 30px rgba(255,215,0,0.5);
+    margin: 6px;
+  }
+
+  .overlay-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 50px rgba(255,215,0,0.8);
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0 30px;
+    min-width: 280px;
+  }
+
+  .stat-box {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--bus-yellow);
+  }
+
+  .stat-lbl {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ---- PICKUP FLASH ---- */
+  .pickup-flash {
+    position: absolute;
+    font-family: 'Orbitron', monospace;
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--neon-green);
+    text-shadow: 0 0 10px var(--neon-green);
+    z-index: 60;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+  }
+
+  @keyframes floatUp {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-60px); }
+  }
+
+  /* ---- CRASH SHAKE ---- */
+  @keyframes crashShake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-12px) rotate(-2deg); }
+    40% { transform: translateX(12px) rotate(2deg); }
+    60% { transform: translateX(-8px); }
+    80% { transform: translateX(8px); }
+  }
+
+  .shaking { animation: crashShake 0.4s ease; }
+
+  /* ---- INSTRUCTIONS ---- */
+  #instructions {
+    position: absolute;
+    bottom: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ---- MINI MAP ---- */
+  #minimap {
+    position: absolute;
+    top: 80px;
+    right: 20px;
+    width: 120px;
+    height: 80px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 6px;
+    z-index: 50;
+    overflow: hidden;
+    padding: 4px;
+  }
+
+  #minimap canvas { width: 100%; height: 100%; }
+
+  /* notification */
+  #notification {
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    color: white;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid var(--neon-green);
+    border-radius: 20px;
+    padding: 8px 24px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <!-- SKY -->
+  <div id="sky">
+    <div id="cityline"></div>
+  </div>
+
+  <!-- ROAD -->
+  <div id="road">
+    <div id="sidewalk"></div>
+  </div>
+
+  <!-- GAME CANVAS (obstacles, passengers, bus stop rendered here) -->
+  <canvas id="gameCanvas" style="position:absolute;inset:0;z-index:10;pointer-events:none;"></canvas>
+
+  <!-- BUS (SVG) -->
+  <div id="bus">
+    <svg width="160" height="80" viewBox="0 0 160 80" xmlns="http://www.w3.org/2000/svg">
+      <!-- Body -->
+      <rect x="10" y="10" width="145" height="52" rx="8" fill="#FF8C00"/>
+      <!-- Roof -->
+      <rect x="14" y="8" width="137" height="12" rx="6" fill="#E07800"/>
+      <!-- Windows -->
+      <rect x="22" y="16" width="24" height="18" rx="3" fill="#87CEEB" opacity="0.9"/>
+      <rect x="52" y="16" width="24" height="18" rx="3" fill="#87CEEB" opacity="0.9"/>
+      <rect x="82" y="16" width="24" height="18" rx="3" fill="#87CEEB" opacity="0.9"/>
+      <rect x="112" y="16" width="24" height="18" rx="3" fill="#87CEEB" opacity="0.9"/>
+      <!-- Window shine -->
+      <rect x="24" y="17" width="6" height="4" rx="1" fill="white" opacity="0.5"/>
+      <rect x="54" y="17" width="6" height="4" rx="1" fill="white" opacity="0.5"/>
+      <rect x="84" y="17" width="6" height="4" rx="1" fill="white" opacity="0.5"/>
+      <rect x="114" y="17" width="6" height="4" rx="1" fill="white" opacity="0.5"/>
+      <!-- Door -->
+      <rect x="22" y="38" width="20" height="22" rx="2" fill="#D06800"/>
+      <circle cx="39" cy="49" r="2" fill="#FFD700"/>
+      <!-- Front -->
+      <rect x="140" y="18" width="8" height="10" rx="2" fill="#FFD700" opacity="0.9"/>
+      <!-- Headlight glow -->
+      <circle cx="152" cy="22" r="6" fill="rgba(255,230,100,0.3)"/>
+      <!-- Back lights -->
+      <rect x="10" y="18" width="6" height="8" rx="1" fill="#FF3333"/>
+      <!-- Number plate -->
+      <rect x="120" y="52" width="28" height="8" rx="1" fill="white"/>
+      <text x="134" y="59" text-anchor="middle" font-size="6" font-family="monospace" fill="#333">MH-12 BUS</text>
+      <!-- Underline stripe -->
+      <rect x="10" y="57" width="145" height="5" rx="0" fill="#E07000"/>
+      <!-- Wheels -->
+      <g class="wheel" style="transform-origin: 35px 68px">
+        <circle cx="35" cy="68" r="11" fill="#222"/>
+        <circle cx="35" cy="68" r="7" fill="#444"/>
+        <circle cx="35" cy="68" r="3" fill="#888"/>
+        <line x1="35" y1="57" x2="35" y2="79" stroke="#666" stroke-width="2"/>
+        <line x1="24" y1="68" x2="46" y2="68" stroke="#666" stroke-width="2"/>
+      </g>
+      <g class="wheel" style="transform-origin: 120px 68px">
+        <circle cx="120" cy="68" r="11" fill="#222"/>
+        <circle cx="120" cy="68" r="7" fill="#444"/>
+        <circle cx="120" cy="68" r="3" fill="#888"/>
+        <line x1="120" y1="57" x2="120" y2="79" stroke="#666" stroke-width="2"/>
+        <line x1="109" y1="68" x2="131" y2="68" stroke="#666" stroke-width="2"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-panel">
+      <div class="hud-label">Score</div>
+      <div class="hud-value" id="scoreDisplay">0</div>
+    </div>
+    <div class="hud-panel" style="text-align:center">
+      <div class="hud-label">Route</div>
+      <div class="hud-value" style="color:#FFD700;text-shadow:0 0 10px #FFD700;font-size:16px" id="routeDisplay">City Express 🚌</div>
+    </div>
+    <div class="hud-panel" style="display:flex;gap:20px">
+      <div>
+        <div class="hud-label">Speed</div>
+        <div class="hud-value" id="speedMeter">0 km/h</div>
+      </div>
+      <div>
+        <div class="hud-label">Lives</div>
+        <div class="hud-value" id="livesDisplay">❤️❤️❤️</div>
+      </div>
+      <div>
+        <div class="hud-label">Riders</div>
+        <div class="hud-value" style="color:#00CFFF;text-shadow:0 0 10px #00CFFF" id="ridersDisplay">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION -->
+  <div id="notification"></div>
+
+  <!-- CANVAS for game objects -->
+  <!-- Controls -->
+  <div id="controls">
+    <button class="ctrl-btn" id="btnUp">▲</button>
+    <button class="ctrl-btn" id="btnLeft">◀</button>
+    <button class="ctrl-btn" id="btnRight">▶</button>
+    <button class="ctrl-btn" id="btnDown">▼</button>
+  </div>
+
+  <!-- Fuel -->
+  <div id="fuelContainer">
+    <div id="fuelLabel">⛽ FUEL</div>
+    <div id="fuelBar"><div id="fuelFill" style="width:100%"></div></div>
+  </div>
+
+  <div id="instructions">Arrow Keys / WASD to drive &nbsp;|&nbsp; Stop at 🚏 bus stops to pick up passengers!</div>
+
+  <!-- START SCREEN -->
+  <div class="overlay" id="startScreen">
+    <div class="overlay-title">🚌 CITY BUS<br>SIMULATOR</div>
+    <div class="overlay-sub">
+      Drive through the city, pick up waiting passengers at bus stops,<br>
+      avoid obstacles, and keep your fuel topped up!
+    </div>
+    <div style="font-family:'Rajdhani';color:rgba(255,255,255,0.6);margin-bottom:20px;font-size:14px;">
+      🎮 WASD / Arrow Keys to drive &nbsp;|&nbsp; 🟡 Stop at bus stops to pick up riders
+    </div>
+    <button class="overlay-btn" onclick="startGame()">START ENGINE 🚀</button>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div class="overlay" id="gameOverScreen" style="display:none">
+    <div class="overlay-title">GAME OVER</div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-num" id="finalScore">0</div>
+        <div class="stat-lbl">Score</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="finalRiders">0</div>
+        <div class="stat-lbl">Riders</div>
+      </div>
+    </div>
+    <button class="overlay-btn" onclick="startGame()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  CITY BUS SIMULATOR — Game Logic
+// ============================================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, roadY, roadH, busLaneTop, busLaneBottom;
+const BUS_W = 160, BUS_H = 80;
+const ROAD_FRACTION = 0.58;
+const SIDEWALK_H = 60;
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  roadY = H * (1 - ROAD_FRACTION);
+  roadH = H * ROAD_FRACTION;
+  busLaneTop    = roadY + 10;
+  busLaneBottom = H - SIDEWALK_H - BUS_H - 10;
+}
+window.addEventListener('resize', () => { resize(); });
+resize();
+
+// --- State ---
+let score = 0, lives = 3, riders = 0, totalRiders = 0;
+let fuel = 100;
+let gameRunning = false;
+let speed = 0;
+const MAX_SPEED = 7;
+const ACCEL = 0.18, DECEL = 0.12, VERT_SPEED = 4;
+
+let busX = 80, busY;
+let keys = {};
+let obstacles = [], passengers = [], busStops = [], fuelCans = [];
+let frameCount = 0;
+let lastObstacleTime = 0;
+let worldX = 0; // for scrolling feel
+
+const busEl = document.getElementById('bus');
+
+// --- Lane stripes ---
+function spawnStripes() {
+  const road = document.getElementById('road');
+  // Clear old
+  road.querySelectorAll('.lane-stripe').forEach(e => e.remove());
+  const laneY1 = roadY + roadH * 0.33;
+  const laneY2 = roadY + roadH * 0.66;
+  [laneY1, laneY2].forEach(ly => {
+    for (let x = -80; x < W + 80; x += 80) {
+      const s = document.createElement('div');
+      s.className = 'lane-stripe';
+      s.style.left = x + 'px';
+      s.style.top = (ly - H * (1 - ROAD_FRACTION)) + 'px';
+      road.appendChild(s);
+    }
+  });
+}
+
+// --- Stars ---
+function spawnStars() {
+  const sky = document.getElementById('sky');
+  sky.querySelectorAll('.star').forEach(e => e.remove());
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 1;
+    s.style.width = size + 'px';
+    s.style.height = size + 'px';
+    s.style.left = Math.random() * 100 + '%';
+    s.style.top = Math.random() * 80 + '%';
+    s.style.animationDelay = Math.random() * 2 + 's';
+    sky.appendChild(s);
+  }
+}
+
+// --- Obstacle types ---
+const OBS_TYPES = [
+  { label: '🚗', w: 60, h: 30, color: '#e74c3c', points: -10 },
+  { label: '🚚', w: 90, h: 35, color: '#e67e22', points: -10 },
+  { label: '🛑', w: 30, h: 30, color: '#c0392b', points: -15 },
+  { label: '🪨', w: 40, h: 30, color: '#95a5a6', points: -5 },
+];
+
+function spawnObstacle() {
+  const t = OBS_TYPES[Math.floor(Math.random() * OBS_TYPES.length)];
+  const laneOptions = [
+    roadY + 20,
+    roadY + roadH * 0.33,
+    roadY + roadH * 0.55,
+  ];
+  const lane = laneOptions[Math.floor(Math.random() * laneOptions.length)];
+  obstacles.push({
+    x: W + 60,
+    y: lane,
+    w: t.w, h: t.h,
+    label: t.label,
+    speed: 2 + Math.random() * 2,
+  });
+}
+
+function spawnPassenger() {
+  const types = ['👴', '👩', '👨', '🧑', '👧', '👦', '🧔', '👩‍💼'];
+  const lbl = types[Math.floor(Math.random() * types.length)];
+  const yOpts = [
+    roadY + 20,
+    roadY + roadH * 0.33,
+    roadY + roadH * 0.55,
+    H - SIDEWALK_H - 30,
+  ];
+  const y = yOpts[Math.floor(Math.random() * yOpts.length)];
+  passengers.push({
+    x: W + 40,
+    y,
+    label: lbl,
+    speed: 1.5 + Math.random(),
+    collected: false,
+  });
+}
+
+function spawnBusStop() {
+  busStops.push({
+    x: W + 40,
+    speed: 1.5,
+    waitingCount: Math.floor(Math.random() * 4) + 1,
+    passed: false,
+  });
+}
+
+function spawnFuelCan() {
+  const y = roadY + 30 + Math.random() * (roadH - SIDEWALK_H - 60);
+  fuelCans.push({ x: W + 30, y, speed: 1.8, collected: false });
+}
+
+// --- Draw ---
+function drawObstacles() {
+  obstacles.forEach(o => {
+    ctx.font = `${Math.min(o.h, 36)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(o.label, o.x + o.w / 2, o.y + o.h * 0.85);
+  });
+}
+
+function drawPassengers() {
+  passengers.forEach(p => {
+    if (p.collected) return;
+    ctx.font = '28px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.label, p.x, p.y + 28);
+    // Waving hand
+    ctx.font = '14px serif';
+    ctx.fillText('🙋', p.x + 14, p.y + 10);
+  });
+}
+
+function drawBusStops() {
+  busStops.forEach(bs => {
+    if (bs.passed) return;
+    const x = bs.x;
+    const y = H - SIDEWALK_H - 80;
+    // Pole
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(x - 3, y, 6, 80);
+    // Sign
+    ctx.fillStyle = '#1a6bbd';
+    ctx.beginPath();
+    ctx.roundRect(x - 30, y, 60, 35, 5);
+    ctx.fill();
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 12px Rajdhani, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🚏 STOP', x, y + 14);
+    ctx.font = '10px Rajdhani';
+    ctx.fillText(`${bs.waitingCount} waiting`, x, y + 28);
+    // People icons
+    for (let i = 0; i < Math.min(bs.waitingCount, 4); i++) {
+      ctx.font = '18px serif';
+      ctx.fillText('🧍', x - 30 + i * 20, y + 55);
+    }
+  });
+}
+
+function drawFuelCans() {
+  fuelCans.forEach(f => {
+    if (f.collected) return;
+    ctx.font = '26px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⛽', f.x, f.y + 26);
+  });
+}
+
+function drawRoadMarkings() {
+  // Dashed center line animation
+  const dashW = 60, dashH = 8, gap = 40, total = dashW + gap;
+  const offset = (worldX % total);
+  ctx.fillStyle = '#666';
+  const laneY1 = roadY + roadH * 0.33;
+  const laneY2 = roadY + roadH * 0.66;
+  [laneY1, laneY2].forEach(ly => {
+    for (let x = -total + offset; x < W; x += total) {
+      ctx.beginPath();
+      ctx.roundRect(x, ly - dashH / 2, dashW, dashH, 3);
+      ctx.fill();
+    }
+  });
+}
+
+// --- Collision ---
+function rectsCollide(ax, ay, aw, ah, bx, by, bw, bh, margin = 0) {
+  return ax < bx + bw - margin &&
+         ax + aw - margin > bx &&
+         ay < by + bh - margin &&
+         ay + ah - margin > by;
+}
+
+// --- Notification ---
+let notifTimeout;
+function showNotif(msg, color = 'var(--neon-green)') {
+  const n = document.getElementById('notification');
+  n.textContent = msg;
+  n.style.borderColor = color;
+  n.style.opacity = '1';
+  clearTimeout(notifTimeout);
+  notifTimeout = setTimeout(() => n.style.opacity = '0', 1800);
+}
+
+// --- Pickup flash ---
+function showPickup(x, y, text, color = '#00FF88') {
+  const el = document.createElement('div');
+  el.className = 'pickup-flash';
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.color = color;
+  el.textContent = text;
+  document.getElementById('gameContainer').appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// --- Crash ---
+function onCrash() {
+  lives = Math.max(0, lives - 1);
+  updateLivesHUD();
+  busEl.classList.add('shaking');
+  setTimeout(() => busEl.classList.remove('shaking'), 500);
+  showNotif('💥 CRASH!', 'var(--neon-red)');
+  if (lives <= 0) endGame();
+}
+
+// --- HUD Updates ---
+function updateHUD() {
+  document.getElementById('scoreDisplay').textContent = score;
+  document.getElementById('speedMeter').textContent = Math.round(speed * 14) + ' km/h';
+  document.getElementById('ridersDisplay').textContent = totalRiders;
+  document.getElementById('fuelFill').style.width = fuel + '%';
+}
+
+function updateLivesHUD() {
+  const hearts = ['', '❤️', '❤️❤️', '❤️❤️❤️'];
+  document.getElementById('livesDisplay').textContent = hearts[lives] || '💔';
+}
+
+// --- Game Loop ---
+function gameLoop() {
+  if (!gameRunning) return;
+  frameCount++;
+  worldX += speed;
+
+  ctx.clearRect(0, 0, W, H);
+  drawRoadMarkings();
+
+  // Bus movement
+  if (keys['ArrowLeft']  || keys['a'] || keys['A']) busX -= 4;
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) busX += 4;
+  if (keys['ArrowUp']    || keys['w'] || keys['W']) {
+    if (busY > busLaneTop) busY -= VERT_SPEED;
+  }
+  if (keys['ArrowDown']  || keys['s'] || keys['S']) {
+    if (busY < busLaneBottom) busY += VERT_SPEED;
+  }
+
+  // Accelerate forward slowly
+  speed = Math.min(speed + 0.01, MAX_SPEED);
+
+  // Keep bus on screen horizontally
+  busX = Math.max(10, Math.min(W - BUS_W - 10, busX));
+
+  // Update bus DOM position
+  busEl.style.left = busX + 'px';
+  busEl.style.top  = busY + 'px';
+
+  // Fuel drain
+  fuel = Math.max(0, fuel - 0.015 * (0.5 + speed / MAX_SPEED));
+  if (fuel <= 0) { showNotif('⛽ OUT OF FUEL!', '#FF4500'); endGame(); return; }
+
+  // Score from driving
+  if (frameCount % 60 === 0) score += Math.floor(speed * 2);
+
+  // Spawn
+  if (frameCount % 80 === 0)  spawnObstacle();
+  if (frameCount % 120 === 0) spawnPassenger();
+  if (frameCount % 200 === 0) spawnBusStop();
+  if (frameCount % 300 === 0) spawnFuelCan();
+
+  // Move & draw obstacles
+  obstacles = obstacles.filter(o => o.x > -100);
+  obstacles.forEach(o => {
+    o.x -= (o.speed + speed * 0.4);
+    // Collision with bus
+    if (rectsCollide(busX, busY, BUS_W, BUS_H, o.x, o.y, o.w, o.h, 12)) {
+      onCrash();
+      o.x = -200; // remove it
+    }
+  });
+  drawObstacles();
+
+  // Move & collect passengers
+  passengers = passengers.filter(p => p.x > -60);
+  passengers.forEach(p => {
+    if (!p.collected) {
+      p.x -= (p.speed + speed * 0.3);
+      if (rectsCollide(busX, busY, BUS_W, BUS_H, p.x, p.y, 30, 40, 5)) {
+        p.collected = true;
+        riders++;
+        totalRiders++;
+        score += 50;
+        showPickup(p.x, p.y, '+50 🧍', '#00FF88');
+        showNotif(`Picked up passenger! +50pts`, '#00CFFF');
+      }
+    }
+  });
+  drawPassengers();
+
+  // Bus stops
+  busStops = busStops.filter(bs => bs.x > -80);
+  busStops.forEach(bs => {
+    bs.x -= (bs.speed + speed * 0.3);
+    // Check if bus is stopped near the stop (low speed)
+    const stopX = bs.x, stopY = H - SIDEWALK_H - 80;
+    if (!bs.passed && speed < 2 && rectsCollide(busX, busY, BUS_W, BUS_H, stopX - 40, stopY, 80, 80, 10)) {
+      const pts = bs.waitingCount * 100;
+      score += pts;
+      totalRiders += bs.waitingCount;
+      riders += bs.waitingCount;
+      fuel = Math.min(100, fuel + 5); // little fuel bonus
+      showPickup(stopX, stopY - 30, `+${pts} 🚏`, '#FFD700');
+      showNotif(`Bus stop! Picked up ${bs.waitingCount} riders! +${pts}pts`, '#FFD700');
+      bs.passed = true;
+    }
+  });
+  drawBusStops();
+
+  // Fuel cans
+  fuelCans = fuelCans.filter(f => f.x > -40);
+  fuelCans.forEach(f => {
+    if (!f.collected) {
+      f.x -= (f.speed + speed * 0.3);
+      if (rectsCollide(busX, busY, BUS_W, BUS_H, f.x - 15, f.y - 15, 40, 40, 5)) {
+        f.collected = true;
+        fuel = Math.min(100, fuel + 25);
+        score += 20;
+        showPickup(f.x, f.y, '+⛽ Fuel!', '#FF8C00');
+        showNotif('⛽ Fuel collected! +25%', '#FF8C00');
+      }
+    }
+  });
+  drawFuelCans();
+
+  updateHUD();
+  requestAnimationFrame(gameLoop);
+}
+
+// --- Start / End ---
+function startGame() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+
+  score = 0; lives = 3; riders = 0; totalRiders = 0; fuel = 100; speed = 1;
+  frameCount = 0; worldX = 0;
+  obstacles = []; passengers = []; busStops = []; fuelCans = [];
+  busX = 80;
+  busY = H * (1 - ROAD_FRACTION) + 80;
+
+  updateHUD();
+  updateLivesHUD();
+  document.getElementById('routeDisplay').textContent = 'City Express 🚌';
+
+  spawnStars();
+  spawnStripes();
+  resize();
+
+  gameRunning = true;
+  requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+  gameRunning = false;
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('finalRiders').textContent = totalRiders;
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+
+// --- Input ---
+document.addEventListener('keydown', e => { keys[e.key] = true; });
+document.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+// Mobile buttons
+function addBtnControl(id, key) {
+  const btn = document.getElementById(id);
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); keys[key] = true; btn.classList.add('pressed'); });
+  btn.addEventListener('pointerup',   e => { e.preventDefault(); keys[key] = false; btn.classList.remove('pressed'); });
+  btn.addEventListener('pointerleave',e => { keys[key] = false; btn.classList.remove('pressed'); });
+}
+addBtnControl('btnUp',    'ArrowUp');
+addBtnControl('btnDown',  'ArrowDown');
+addBtnControl('btnLeft',  'ArrowLeft');
+addBtnControl('btnRight', 'ArrowRight');
+
+// Init canvas size
+resize();
+spawnStars();
+</script>
+</body>
+</html>
